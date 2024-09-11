@@ -1,18 +1,35 @@
+# use_session.py
+
 import logging
 from kiteconnect import KiteConnect
+from datetime import datetime, timedelta
+import pandas as pd
+import numpy as np
+import talib
+import json
 
+# Initialize logging
 logging.basicConfig(level=logging.DEBUG)
 
-kite = KiteConnect(api_key="your_api_key")
 
-# Redirect the user to the login url obtained
-# from kite.login_url(), and receive the request_token
-# from the registered redirect url after the login flow.
-# Once you have the request_token, obtain the access_token
-# as follows.
+# Step 1: Load API key and secret from key.json
+with open('kite_key.json', 'r') as f:
+    keys = json.load(f)
 
-data = kite.generate_session("request_token_here", secret="your_secret")
-kite.set_access_token(data["access_token"])
+api_key = keys.get('api_key')
+api_secret = keys.get('api_secret')
+
+# Step 2: Load the stored session (access token) from the JSON file
+with open('kite_session.json', 'r') as f:
+    session_data = json.load(f)
+
+access_token = session_data.get("access_token")
+
+# Step 3: Initialize KiteConnect with the saved access token
+kite = KiteConnect(api_key=api_key)
+kite.set_access_token(access_token)
+
+################################################################################################
 
 # Place an order
 try:
