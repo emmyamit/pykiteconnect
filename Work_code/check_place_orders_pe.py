@@ -6,7 +6,7 @@ from kiteconnect import KiteConnect
 
 # Define the symbol for which we want to check and place an order (example: NIFTY)
 symbol = 'BANKNIFTY2491151200PE'
-quantity = '60'
+quantity = '15'
 
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG)
@@ -81,11 +81,11 @@ def buy_stock(symbol, order_file='order_pe.json', signal_file='signal_pe.json'):
             try:
                 order_id = kite.place_order(
                     variety=kite.VARIETY_REGULAR,
-                    exchange=kite.EXCHANGE_NSE,
+                    exchange=kite.EXCHANGE_NFO,
                     tradingsymbol=symbol,
                     transaction_type=kite.TRANSACTION_TYPE_BUY,
                     quantity=quantity,
-                    product=kite.PRODUCT_CNC,
+                    product=kite.PRODUCT_NRML,
                     order_type=kite.ORDER_TYPE_MARKET
                 )
             

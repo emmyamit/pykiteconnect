@@ -39,7 +39,7 @@ instruments = kite.instruments("NFO")
 df = pd.DataFrame(instruments)
 
 # Filter contracts for NIFTY 50 (includes futures and options)
-nifty_contracts_df = df[df['tradingsymbol'].str.contains("BANKNIFTY2491151200PE") & 
+nifty_contracts_df = df[df['tradingsymbol'].str.contains("BANKNIFTY2491851200PE") & 
                     (df['segment'] == 'NFO-OPT') &
                     (df['name'] == 'BANKNIFTY')]
 
@@ -51,7 +51,7 @@ print(nifty_contracts_df.head())
 #Step 4 - Download hostorical data using kite's api session created in step 1
 
 # Define the instrument token and the time period
-instrument_token = 	12402178  # Example: Token for NIFTY (NIFTY)
+instrument_token = 	11475458  # Example: Token for NIFTY (NIFTY)
 from_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
 to_date = datetime.now().strftime('%Y-%m-%d')
 interval = "minute"  # Can be "minute", "5minute", "15minute", "day", etc.

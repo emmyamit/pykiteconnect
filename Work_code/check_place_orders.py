@@ -3,10 +3,15 @@ import os
 import logging
 from datetime import datetime
 from kiteconnect import KiteConnect
+import pandas as pd
 
 # Define the symbol for which we want to check and place an order (example: NIFTY)
-symbol = 'BANKNIFTY2491151200CE'
-quantity = '60'
+csv_file_path = 'options_tradingsymbols_ce.csv'  # Update this with the actual path to your file
+options_csv_df = pd.read_csv(csv_file_path)
+symbol = options_csv_df.tradingsymbol.iloc[0]
+
+# Quantity to buy
+quantity = 15
 
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG)
@@ -81,11 +86,11 @@ def buy_stock(symbol, order_file='order.json', signal_file='signal.json'):
             try:
                 order_id = kite.place_order(
                     variety=kite.VARIETY_REGULAR,
-                    exchange=kite.EXCHANGE_NSE,
+                    exchange=kite.EXCHANGE_NFO,
                     tradingsymbol=symbol,
                     transaction_type=kite.TRANSACTION_TYPE_BUY,
                     quantity=quantity,
-                    product=kite.PRODUCT_CNC,
+                    product=kite.PRODUCT_NRML,
                     order_type=kite.ORDER_TYPE_MARKET
                 )
             

@@ -1,5 +1,5 @@
 {
-    "EMA_Signal": "Sell",
+    "EMA_Signal": "Buy",
     "RSI_Signal": "Hold",
-    "Supertrend_Signal": "Sell"
+    "Supertrend_Signal": "Buy"
 }
