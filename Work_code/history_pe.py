@@ -1,5 +1,4 @@
 # use_session.py
-
 import logging
 from kiteconnect import KiteConnect
 from datetime import datetime, timedelta
@@ -31,27 +30,34 @@ kite.set_access_token(access_token)
 
 ################################################################################################
 
-
 # Fetch all instruments for NSE
 instruments = kite.instruments("NFO")
 
 # Convert to DataFrame for easier filtering
 df = pd.DataFrame(instruments)
 
-# Filter contracts for NIFTY 50 (includes futures and options)
-nifty_contracts_df = df[df['tradingsymbol'].str.contains("BANKNIFTY2491851200PE") & 
-                    (df['segment'] == 'NFO-OPT') &
-                    (df['name'] == 'BANKNIFTY')]
+csv_file_path = 'options_tradingsymbols_pe.csv'  # Update this with the actual path to your file
+options_csv_df = pd.read_csv(csv_file_path)
 
-# Display the first few rows of the DataFrame
-print(nifty_contracts_df.head())
+# Step 5: Filter contracts that match the trading symbols in the CSV file
+matching_contracts_df = df[df['tradingsymbol'].isin(options_csv_df['tradingsymbol'])]
+
+# Display the first few matching contracts
+print(matching_contracts_df.head())
+
+# Step 6: Extract the first matching instrument token and store it in a variable
+if not matching_contracts_df.empty:
+    instrument_token = matching_contracts_df.iloc[0]['instrument_token']
+    tradingsymbol = matching_contracts_df.iloc[0]['tradingsymbol']
+    logging.info(f"Instrument token for {tradingsymbol} is {instrument_token}")
+else:
+    logging.error("No matching instruments found.")
 
 ################################################################################################
 
 #Step 4 - Download hostorical data using kite's api session created in step 1
 
 # Define the instrument token and the time period
-instrument_token = 	11475458  # Example: Token for NIFTY (NIFTY)
 from_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
 to_date = datetime.now().strftime('%Y-%m-%d')
 interval = "minute"  # Can be "minute", "5minute", "15minute", "day", etc.
