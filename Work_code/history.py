@@ -137,6 +137,3 @@ with open('signal.json', 'w') as json_file:
     json.dump(signals_dict, json_file, indent=4)
 
 logging.info("Signals saved to kite_signal.json")
-
-
-

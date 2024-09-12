@@ -17,7 +17,7 @@ kite = KiteConnect(api_key=api_key)
 
 # Replace this with your login link and retrieve the request token after login
 # https://kite.zerodha.com/connect/login?api_key=your_api_key&v=3
-request_token = "B7Bw3YIH2D6CKuIR6oYYmWUo5mnioi6j"  # You need to manually enter this after login
+request_token = "5IFnATDY1MX8B4ZEYxhkj4aw2zRl5zqx"  # You need to manually enter this after login
 
 # Step 3: Generate session
 data = kite.generate_session(request_token, api_secret=api_secret)
