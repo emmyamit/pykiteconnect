@@ -42,13 +42,13 @@ options_csv_df = pd.read_csv(csv_file_path)
 matching_contracts_df = df[df['tradingsymbol'].isin(options_csv_df['tradingsymbol'])]
 
 # Display the first few matching contracts
-print(matching_contracts_df.head())
+#print(matching_contracts_df.head())
 
 # Step 6: Extract the first matching instrument token and store it in a variable
 if not matching_contracts_df.empty:
     instrument_token = matching_contracts_df.iloc[0]['instrument_token']
     tradingsymbol = matching_contracts_df.iloc[0]['tradingsymbol']
-    logging.info(f"Instrument token for {tradingsymbol} is {instrument_token}")
+    #logging.info(f"Instrument token for {tradingsymbol} is {instrument_token}")
 else:
     logging.error("No matching instruments found.")
 
@@ -131,6 +131,9 @@ signals_df = niftydf[['EMA_Signal', 'RSI_Signal', 'Supertrend_Signal']]
 
 # Convert the signals DataFrame to a dictionary (to be JSON serializable)
 signals_dict = signals_df.tail(1).to_dict(orient='records')[0]  # Only store the last row of signals
+
+# Add the tradingsymbol to the signals dictionary
+signals_dict['tradingsymbol'] = tradingsymbol
 
 # Save the signals to a JSON file
 with open('signal.json', 'w') as json_file:

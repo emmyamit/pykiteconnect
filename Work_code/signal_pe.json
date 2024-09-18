@@ -1,5 +1,7 @@
 {
-    "EMA_Signal": "Buy",
+    "EMA_Signal": "Sell",
     "RSI_Signal": "Hold",
-    "Supertrend_Signal": "Buy"
+    "Supertrend_Signal": "Sell",
+    "close": 0.05,
+    "tradingsymbol": "BANKNIFTY2491852200PE"
 }

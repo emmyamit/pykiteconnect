@@ -1,8 +1,8 @@
 [
     {
-        "symbol": "BANKNIFTY2491851200CE",
-        "order_type": "Buy",
+        "symbol": "BANKNIFTY2491851800CE",
+        "order_type": "Sell",
         "quantity": 15,
-        "timestamp": "2024-09-13 02:06:33"
+        "timestamp": "2024-09-15 17:13:43"
     }
 ]

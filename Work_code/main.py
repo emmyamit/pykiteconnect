@@ -25,11 +25,11 @@ def job():
     run_script('orders_pe.py')  # Run file 4
 
 # Schedule the job to run every 5 minutes
-schedule.every(1).minutes.do(job)
+schedule.every(30).seconds.do(job)
 
 # Keep running the scheduler
 if __name__ == "__main__":
     logging.info("Starting the scheduling process.")
     while True:
         schedule.run_pending()
-        time.sleep(1)  # Wait for a second before checking the schedule again
+        time.sleep(0)  # Wait for a second before checking the schedule again

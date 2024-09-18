@@ -10,7 +10,6 @@ import json
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG)
 
-
 # Step 1: Load API key and secret from key.json
 with open('kite_key.json', 'r') as f:
     keys = json.load(f)
@@ -43,20 +42,19 @@ options_csv_df = pd.read_csv(csv_file_path)
 matching_contracts_df = df[df['tradingsymbol'].isin(options_csv_df['tradingsymbol'])]
 
 # Display the first few matching contracts
-print(matching_contracts_df.head())
+#print(matching_contracts_df.head())
 
 # Step 6: Extract the first matching instrument token and store it in a variable
 if not matching_contracts_df.empty:
     instrument_token = matching_contracts_df.iloc[0]['instrument_token']
     tradingsymbol = matching_contracts_df.iloc[0]['tradingsymbol']
-    logging.info(f"Instrument token for {tradingsymbol} is {instrument_token}")
+    #logging.info(f"Instrument token for {tradingsymbol} is {instrument_token}")
 else:
     logging.error("No matching instruments found.")
 
 ################################################################################################
 
 #Step 4 - Download hostorical data using kite's api session created in step 1
-
 # Define the instrument token and the time period
 from_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
 to_date = datetime.now().strftime('%Y-%m-%d')
@@ -74,7 +72,6 @@ except Exception as e:
 ######################################################################################################
 
 #Step 5 - add RSI, EMA and Supertrend indicator to Historical data
- 
 # Example: Exponential Moving Average (EMA) signal using TA-Lib
 def ema_signal(df, window=30):
     df['EMA'] = talib.EMA(df['close'], timeperiod=window)  # Using TA-Lib EMA
@@ -130,16 +127,16 @@ except Exception as e:
     logging.error(f"An error occurred: {e}")
 
 # Extract the signal columns
-signals_df = niftydf[['EMA_Signal', 'RSI_Signal', 'Supertrend_Signal']]
+signals_df = niftydf[['EMA_Signal', 'RSI_Signal', 'Supertrend_Signal','close']]
 
 # Convert the signals DataFrame to a dictionary (to be JSON serializable)
 signals_dict = signals_df.tail(1).to_dict(orient='records')[0]  # Only store the last row of signals
+
+# Add the tradingsymbol to the signals dictionary
+signals_dict['tradingsymbol'] = tradingsymbol
 
 # Save the signals to a JSON file
 with open('signal_pe.json', 'w') as json_file:
     json.dump(signals_dict, json_file, indent=4)
 
 logging.info("Signals saved to kite_signal_pe.json")
-
-
-

@@ -1,17 +1,10 @@
-import json
-import os
 import logging
-from datetime import datetime
 from kiteconnect import KiteConnect
+from datetime import datetime, timedelta
 import pandas as pd
-
-# Define the symbol for which we want to check and place an order (example: NIFTY)
-csv_file_path = 'options_tradingsymbols_ce.csv'  # Update this with the actual path to your file
-options_csv_df = pd.read_csv(csv_file_path)
-symbol = options_csv_df.tradingsymbol.iloc[0]
-
-# Quantity to buy
-quantity = 15
+import numpy as np
+import talib
+import json
 
 # Initialize logging
 logging.basicConfig(level=logging.DEBUG)
@@ -33,186 +26,118 @@ access_token = session_data.get("access_token")
 kite = KiteConnect(api_key=api_key)
 kite.set_access_token(access_token)
 
-#############################################################################################
+################################################################################################
 
-# Initialize logging
-logging.basicConfig(level=logging.DEBUG)
+# Fetch all instruments for NSE
+instruments = kite.instruments("NFO")
 
-# 1. Check if there is an existing order in order.json
-def check_existing_order(symbol, order_file='order.json'):
-    if os.path.exists(order_file):
-        with open(order_file, 'r') as file:
-            try:
-                orders = json.load(file)
-            except json.JSONDecodeError:
-                orders = []  # If JSON is malformed or empty, treat it as no orders
-    else:
-        orders = []  # No file means no orders
+# Convert to DataFrame for easier filtering
+df = pd.DataFrame(instruments)
 
-    for order in orders:
-        if order.get('symbol') == symbol:
-            return order  # Return the existing order
+csv_file_path = 'options_tradingsymbols_ce.csv'  # Update this with the actual path to your file
+options_csv_df = pd.read_csv(csv_file_path)
 
-    return None  # No existing order for the symbol
+# Step 5: Filter contracts that match the trading symbols in the CSV file
+matching_contracts_df = df[df['tradingsymbol'].isin(options_csv_df['tradingsymbol'])]
 
-# 2. Check the signal in signal.json file
-def check_signal(signal_file='signal.json'):
-    if os.path.exists(signal_file):
-        with open(signal_file, 'r') as file:
-            try:
-                signals = json.load(file)
-            except json.JSONDecodeError:
-                logging.error("Error reading signal.json")
-                return None
-    else:
-        logging.error(f"{signal_file} not found!")
-        return None
+# Step 6: Extract the first matching instrument token and store it in a variable
+if not matching_contracts_df.empty:
+    instrument_token = matching_contracts_df.iloc[0]['instrument_token']
+    tradingsymbol = matching_contracts_df.iloc[0]['tradingsymbol']
+else:
+    logging.error("No matching instruments found.")
 
-    # Retrieve the value of 'Supertrend_Signal' key
-    return signals.get("Supertrend_Signal", "")
+################################################################################################
 
-##########################################################################################################
+# Step 4 - Download historical data using kite's API session created in step 1
+# Define the instrument token and the time period
+from_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
+to_date = datetime.now().strftime('%Y-%m-%d')
+interval = "minute"  # Can be "minute", "5minute", "15minute", "day", etc.
 
-# 3. Buy stock if signal is "Buy" and no existing order
-def buy_stock(symbol, order_file='order.json', signal_file='signal.json'):
-    supertrend_signal = check_signal(signal_file)
-    existing_order = check_existing_order(symbol, order_file)
-    if supertrend_signal == "Buy":
-        if not existing_order:
-            logging.info(f"Placing buy order for {symbol}.")
-            place_new_order(symbol, order_type="Buy", order_file=order_file)
+try:
+    # Fetch historical data
+    historical_data = kite.historical_data(instrument_token, from_date, to_date, interval)
+    niftydf = pd.DataFrame(historical_data)
+except Exception as e:
+    logging.error(f"Error fetching historical data: {e}")
 
-            # Place an order
-            try:
-                order_id = kite.place_order(
-                    variety=kite.VARIETY_REGULAR,
-                    exchange=kite.EXCHANGE_NFO,
-                    tradingsymbol=symbol,
-                    transaction_type=kite.TRANSACTION_TYPE_BUY,
-                    quantity=quantity,
-                    product=kite.PRODUCT_NRML,
-                    order_type=kite.ORDER_TYPE_MARKET
-                )
-                logging.info("Order placed. ID is: {}".format(order_id))
-            except Exception as e:
-                logging.info("Order placement failed: {}".format(e))
+######################################################################################################
+
+# Step 5 - Add RSI, EMA, Supertrend, and DMI signals to historical data
+# Example: Exponential Moving Average (EMA) signal using TA-Lib
+def ema_signal(df, window=30):
+    df['EMA'] = talib.EMA(df['close'], timeperiod=window)  # Using TA-Lib EMA
+    df['EMA_Signal'] = np.where(df['close'] > df['EMA'], 'Buy', 'Sell')
+    return df
+
+# Example: RSI (Relative Strength Index) signal using TA-Lib
+def rsi_signal(df, window=14):
+    df['RSI'] = talib.RSI(df['close'], timeperiod=window)  # Using TA-Lib RSI
+    df['RSI_Signal'] = np.where(df['RSI'] > 80, 'Sell', np.where(df['RSI'] < 15, 'Buy', 'Hold'))
+    return df
+
+# Example: Supertrend signal using TA-Lib ATR
+def supertrend(df, period=7, multiplier=3):
+    high = df['high']
+    low = df['low']
+    close = df['close']
+
+    atr = talib.ATR(high, low, close, timeperiod=period)
+    upper_band = ((high + low) / 2) + (multiplier * atr)
+    lower_band = ((high + low) / 2) - (multiplier * atr)
+
+    supertrend = [True] * len(df)
+
+    for i in range(1, len(df.index)):
+        if close[i] > upper_band[i-1]:
+            supertrend[i] = True
+        elif close[i] < lower_band[i-1]:
+            supertrend[i] = False
         else:
-            logging.info(f"Buy order for {symbol} already exists. Waiting for sell signal.")
-    else:
-        logging.info(f"No buy signal found for {symbol}.")
+            supertrend[i] = supertrend[i-1]
 
-###########################################################################################################                
+        if supertrend[i]:
+            lower_band[i] = max(lower_band[i], lower_band[i-1])
+        else:
+            upper_band[i] = min(upper_band[i], upper_band[i-1])
 
-def target_profit(order_id):
-    try:
-        # Fetch the order history for the specific order ID
-        order_history = kite.order_history(order_id=order_id)
-        
-        # Loop through the order history to get the buy price and quantity
-        for order in order_history:
-            if order['status'] == 'COMPLETE':
-                target_price = order.get('average_price', 0)  # Get the average buy price
-                target_price = target_price + 20
-                print("Place sell order")
-                kite.place_order(
-                    variety=kite.VARIETY_REGULAR,
-                    exchange=kite.EXCHANGE_NFO,  # NFO for options
-                    tradingsymbol=symbol,  # Use the tradingsymbol from your position
-                    transaction_type=kite.TRANSACTION_TYPE_SELL,  # Sell to exit position
-                    quantity=quantity,  # Quantity of the position
-                    product=kite.PRODUCT_NRML,  # Use MIS for intraday, CNC for delivery
-                    order_type=kite.ORDER_TYPE_LIMIT,  # Market order to sell at current price
-                    price=target_price
-                )
-                break  # Stop after finding the completed order
-            else:
-                logging.info(f"Order {order_id} not yet completed or no matching status.")
+    df['Supertrend'] = supertrend
+    df['Supertrend_Signal'] = np.where(df['Supertrend'], 'Buy', 'Sell')
+    return df
 
-    except Exception as e:
-        logging.error(f"Error fetching order history for {order_id}: {e}")
+# Example: DMI (Directional Movement Index) signal using TA-Lib
+def dmi_signal(df, period=14):
+    df['+DI'] = talib.PLUS_DI(df['high'], df['low'], df['close'], timeperiod=period)
+    df['-DI'] = talib.MINUS_DI(df['high'], df['low'], df['close'], timeperiod=period)
 
-########################################################################################################
+    # Buy signal when +DI crosses above -DI
+    # Sell signal when -DI crosses above +DI
+    df['DMI_Signal'] = np.where(df['+DI'] > df['-DI'], 'Buy', 'Sell')
+    return df
 
-# 4. Update the order in order.json
-def update_order(symbol, new_order_type, order_file='order.json'):
-    if os.path.exists(order_file):
-        with open(order_file, 'r') as file:
-            try:
-                orders = json.load(file)
-            except json.JSONDecodeError:
-                orders = []
-    else:
-        orders = []
+# Apply all signals to niftydf
+try:
+    niftydf = ema_signal(niftydf)  # Apply EMA
+    niftydf = supertrend(niftydf)  # Apply Supertrend
+    niftydf = rsi_signal(niftydf)  # Apply RSI
+    niftydf = dmi_signal(niftydf)  # Apply DMI
+except KeyError as e:
+    logging.error(f"KeyError: {e}")
+except Exception as e:  
+    logging.error(f"An error occurred: {e}")
 
-    order_updated = False
-    for order in orders:
-        if order['symbol'] == symbol:
-            order['order_type'] = new_order_type
-            order['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            order_updated = True
+# Extract the signal columns
+signals_df = niftydf[['EMA_Signal', 'RSI_Signal', 'Supertrend_Signal', 'DMI_Signal']]
 
-    if not order_updated:
-        logging.error(f"No existing order found for {symbol} to update.")
-        return
+# Convert the signals DataFrame to a dictionary (to be JSON serializable)
+signals_dict = signals_df.tail(1).to_dict(orient='records')[0]  # Only store the last row of signals
 
-    if new_order_type == "Sell":
-        # Clear the order.json file if the new order type is "Sell"
-        with open(order_file, 'w') as file:
-            json.dump([], file)  # Write an empty list to clear the file
-        logging.info(f"Order file cleared after selling {symbol}.")
-   # else:
-   #     with open(order_file, 'w') as file:
-   #         json.dump(orders, file, indent=4)
-   #     logging.info(f"Order updated to {new_order_type} for {symbol}.")
+# Add the tradingsymbol to the signals dictionary
+signals_dict['tradingsymbol'] = tradingsymbol
 
-###########################################################################################################            
+# Save the signals to a JSON file
+with open('signal.json', 'w') as json_file:
+    json.dump(signals_dict, json_file, indent=4)
 
-# Function to place a new order and write it to order.json
-def place_new_order(symbol, order_type="Buy", quantity=quantity, order_file='order.json'):
-    new_order = {
-        "symbol": symbol,
-        "order_type": order_type,
-        "quantity": quantity,
-        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    }
-
-    if os.path.exists(order_file):
-        with open(order_file, 'r') as file:
-            try:
-                orders = json.load(file)
-            except json.JSONDecodeError:
-                orders = []
-    else:
-        orders = []
-
-    orders.append(new_order)
-
-    with open(order_file, 'w') as file:
-        json.dump(orders, file, indent=4)
-
-    logging.info(f"New order placed: {new_order}")
-
-###########################################################################################################            
-
-# 5. Main function to call all functions
-def main():
-    logging.info("Starting the order management process.")
-    # Check the signal and existing orders
-    supertrend_signal = check_signal()
-    existing_order = check_existing_order(symbol)
-    if supertrend_signal == "Buy":
-        order_id = buy_stock(symbol)  # Get the order ID from buy_stock
-        if order_id:
-            target_profit(order_id)  # Pass the order ID to target_profit
-    elif supertrend_signal == "Sell":
-        if existing_order and existing_order['order_type'] == 'Buy':
-            # sell_stock(symbol)
-            logging.info(f"Supertrend signal is Sell for {symbol}. Closing buy order.")
-            update_order(symbol, "Sell")
-        elif not existing_order:
-            logging.info(f"No existing order to sell for {symbol}.")
-    else:
-        logging.info(f"No actionable signal for {symbol}: {supertrend_signal}")
-
-if __name__ == "__main__":
-    main()
+logging.info("Signals saved to kite_signal.json")

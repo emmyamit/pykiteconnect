@@ -4,7 +4,6 @@ import logging
 from datetime import datetime
 from kiteconnect import KiteConnect
 import pandas as pd
-from get_orders_pe import get_order_average_price
 
 # Define the symbol for which we want to check and place an order (example: NIFTY)
 csv_file_path = 'options_tradingsymbols_pe.csv'  # Update this with the actual path to your file
@@ -60,23 +59,20 @@ def check_signal(signal_file='signal_pe.json'):
             try:
                 signals = json.load(file)
             except json.JSONDecodeError:
-                logging.error(f"Error reading {signal_file}. Invalid JSON format.")
-                return None, None
+                logging.error("Error reading signal_pe.json")
+                return None
     else:
         logging.error(f"{signal_file} not found!")
-        return None, None
+        return None
 
-    # Retrieve the 'Supertrend_Signal' and 'close' values
-    supertrend_signal = signals.get("Supertrend_Signal", "")
-    close_price = signals.get("close", "")
-    
-    return supertrend_signal, close_price
+    # Retrieve the value of 'Supertrend_Signal' key
+    return signals.get("Supertrend_Signal", "")
 
 ##########################################################################################################
 
 # 3. Manage buy and sell orders in one function
 def manage_order(symbol, quantity, order_file='order_pe.json', signal_file='signal_pe.json'):
-    supertrend_signal, close_price = check_signal(signal_file)
+    supertrend_signal = check_signal(signal_file)
     existing_order = check_existing_order(symbol, order_file)
 
     if supertrend_signal == "Buy":
@@ -86,7 +82,7 @@ def manage_order(symbol, quantity, order_file='order_pe.json', signal_file='sign
 
             # Place a buy order
             try:
-                order_id = kite.place_order(
+                kite.place_order(
                     variety=kite.VARIETY_REGULAR,
                     exchange=kite.EXCHANGE_NFO,
                     tradingsymbol=symbol,
@@ -95,22 +91,16 @@ def manage_order(symbol, quantity, order_file='order_pe.json', signal_file='sign
                     product=kite.PRODUCT_NRML,
                     order_type=kite.ORDER_TYPE_MARKET
                 )
-                print(order_id)
-                order_id = order_id.get('order_id')  # Ensure that order_id is extracted properly
-                logging.info(f"Buy order placed for {symbol}, Order ID: {order_id}")
-
-                # Append buy order ID to avg_price.json
-                append_order_id_to_json(order_id, avg_price_file='avg_price.json')
-
+                logging.info(f"Buy order placed for {symbol}.")
             except Exception as e:
-                logging.error(f"Buy order placement failed: {e}")
+                logging.info(f"Buy order placement failed: {e}")
         else:
             logging.info(f"Buy order for {symbol} already exists. Waiting for sell signal.")
 
-    elif supertrend_signal == "Sell" or close_price >= buy_price + 20:
+    elif supertrend_signal == "Sell":
         if not existing_order or existing_order['order_type'] == "Buy":
             logging.info(f"Placing sell order for {symbol}.")
-            order_id = place_new_order(symbol, order_type="Sell", quantity=quantity, order_file=order_file)
+            place_new_order(symbol, order_type="Sell", quantity=quantity, order_file=order_file)
 
             # Place a sell order
             try:
@@ -125,7 +115,7 @@ def manage_order(symbol, quantity, order_file='order_pe.json', signal_file='sign
                 )
                 logging.info(f"Sell order placed for {symbol}.")
             except Exception as e:
-                logging.error(f"Sell order placement failed: {e}")
+                logging.info(f"Sell order placement failed: {e}")
         else:
             logging.info(f"Sell order for {symbol} already exists. Waiting for new buy signal.")
 
@@ -148,30 +138,6 @@ def place_new_order(symbol, order_type="Buy", quantity=quantity, order_file='ord
         json.dump([new_order], file, indent=4)  # Write only the new order, overwriting the old one
 
     logging.info(f"New {order_type} order placed: {new_order}")
-    return new_order.get('order_id')  # Return the order ID to append to avg_price.json
-
-###########################################################################################################
-
-# Function to append order ID to avg_price.json
-def append_order_id_to_json(order_id, avg_price_file='avg_price.json'):
-    data = {}
-    
-    # Load existing data if file exists
-    if os.path.exists(avg_price_file):
-        with open(avg_price_file, 'r') as file:
-            try:
-                data = json.load(file)
-            except json.JSONDecodeError:
-                logging.error(f"Error reading {avg_price_file}. Invalid JSON format.")
-    
-    # Append the new order ID
-    data['order_id'] = order_id
-
-    # Write updated data back to the file
-    with open(avg_price_file, 'w') as file:
-        json.dump(data, file, indent=4)
-    
-    logging.info(f"Appended order ID {order_id} to {avg_price_file}")
 
 ###########################################################################################################
 
