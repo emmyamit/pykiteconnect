@@ -1,0 +1,8 @@
+{
+    "EMA_Signal": "Buy",
+    "RSI_Signal": "Buy",
+    "Supertrend_Signal": "Buy",
+    "close": 536.8,
+    "is_consolidating": "True",
+    "tradingsymbol": "BANKNIFTY24SEP53200CE"
+}
